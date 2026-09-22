@@ -62,6 +62,11 @@ function Screen(ctx) {
     })();
   }
 
+  var s5 = ctx.useState("jev_or_key", "");
+  var orKey = s5[0], setOrKey = s5[1];
+  var s6 = ctx.useState("jev_ts_key", "");
+  var tsKey = s6[0], setTsKey = s6[1];
+
   var hasOR = readEnv(constants.ENV_KEYS.openrouterKey).trim().length > 0;
   var hasTS = readEnv(constants.ENV_KEYS.typesafeKey).trim().length > 0;
 
@@ -93,9 +98,21 @@ function Screen(ctx) {
         UI.Text({ text: "通道与密钥", style: "bodyMedium", fontWeight: "semibold" }),
         UI.TextField({ value: provider, onValueChange: function (v) { setProvider(v); }, label: "通道：auto / openrouter / typesafe / simulation", singleLine: true }),
         UI.TextButton({ text: "保存通道", onClick: function () { put(constants.ENV_KEYS.provider, provider.trim() || "auto"); } }),
-        UI.Text({ text: hasOR ? "OPENROUTER_API_KEY：已配置" : "OPENROUTER_API_KEY：未配置", style: "bodySmall", color: C.onSurfaceVariant.copy({ alpha: 0.8 }) }),
-        UI.Text({ text: hasTS ? "TYPESAFE_API_KEY：已配置" : "TYPESAFE_API_KEY：未配置", style: "bodySmall", color: C.onSurfaceVariant.copy({ alpha: 0.8 }) }),
-        UI.Text({ text: "出于安全，面板不回显密钥值；请在 Operit 的环境变量设置里按上面键名填写。", style: "bodySmall", color: C.onSurfaceVariant.copy({ alpha: 0.7 }) })
+        UI.TextField({ value: orKey, onValueChange: function (v) { setOrKey(v); }, label: "OpenRouter Key（粘贴后点下方保存）", singleLine: true }),
+        UI.TextField({ value: tsKey, onValueChange: function (v) { setTsKey(v); }, label: "TypeSafe Key（粘贴后点下方保存）", singleLine: true }),
+        UI.Row({ horizontalArrangement: "end" }, [
+          UI.TextButton({
+            text: "保存密钥",
+            onClick: function () {
+              if (orKey.trim()) put(constants.ENV_KEYS.openrouterKey, orKey.trim());
+              if (tsKey.trim()) put(constants.ENV_KEYS.typesafeKey, tsKey.trim());
+              setOrKey("");
+              setTsKey("");
+            }
+          })
+        ]),
+        UI.Text({ text: "密钥状态：" + (hasOR ? "OpenRouter 已配置" : "OpenRouter 未配置") + " · " + (hasTS ? "TypeSafe 已配置" : "TypeSafe 未配置"), style: "bodySmall", color: C.onSurfaceVariant.copy({ alpha: 0.85 }) }),
+        UI.Text({ text: "密钥只写入本机环境变量，面板不回显、留空点保存不改动；也可在 Operit 的「环境配置」界面里填。", style: "bodySmall", color: C.onSurfaceVariant.copy({ alpha: 0.7 }) })
       ])
     ]),
     UI.Card({ containerColor: C.surfaceVariant.copy({ alpha: 0.35 }), shape: { cornerRadius: 12 }, elevation: 0 }, [
