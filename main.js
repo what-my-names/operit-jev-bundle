@@ -50,18 +50,38 @@ async function readFileText(path) {
   }
 }
 
-/* 取值顺序：环境变量 > prompt.txt > prompt.js 默认值 */
+/* 技能检测：装了对应 Skill 就写进提示词，实现 skill ↔ toolpkg 联动 */
+var cachedSkills = [];
+var SKILLS_DIR = "/sdcard/Download/Operit/skills/";
+var SKILLS_TO_DETECT = ["jev", "jev-act", "jev-documents", "jev-eval", "jev-triage"];
+
+async function detectSkills() {
+  var found = [];
+  for (var i = 0; i < SKILLS_TO_DETECT.length; i++) {
+    var name = SKILLS_TO_DETECT[i];
+    try {
+      var info = await Tools.Files.exists(SKILLS_DIR + name + "/SKILL.md", "android");
+      if (info && info.exists) found.push(name);
+    } catch (e) {}
+  }
+  cachedSkills = found;
+  try {
+    await writeEnv("JEV_SKILLS_FOUND", found.join(","));
+  } catch (e) {}
+  return found;
+}
+
+/* 取值顺序：环境变量 > prompt.txt > prompt.js 默认值；末尾按需追加技能联动段 */
 async function refreshPrompt() {
   var fromEnv = readEnv(constants.ENV_KEYS.customPrompt).trim();
-  if (fromEnv) { cachedPrompt = fromEnv; return cachedPrompt; }
-  var fromFile = (await readFileText(constants.PROMPT_PATH)).trim();
-  cachedPrompt = fromFile;
+  if (fromEnv) { cachedPrompt = fromEnv; }
+  else { cachedPrompt = (await readFileText(constants.PROMPT_PATH)).trim(); }
+  detectSkills().catch(function () {});
   return cachedPrompt;
 }
 
 function currentPromptText() {
-  var text = (cachedPrompt || "").trim();
-  return text || promptMod.DEFAULT_PROMPT;
+  return promptMod.buildPrompt(cachedPrompt, cachedSkills);
 }
 
 /* ── 1) 系统提示词注入：只在开关开启时追加，关闭则原样返回（零 token 开销） ── */
