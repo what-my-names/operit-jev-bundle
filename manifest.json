@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "toolpkg_id": "com.whatmynames.jev_bundle",
+  "version": "0.1.0",
+  "author": ["what-my-names"],
+  "main": "main.js",
+  "name": "jev_bundle",
+  "display_name": {
+    "zh": "Jev 决策",
+    "en": "Jev Decision"
+  },
+  "description": {
+    "zh": "把「选择 / 分类 / 评分」交给 Jev 的类型化判断：输入框开关 + 系统提示词注入 + jev_decide / jev_reference 两个工具。无 key 时降级为如实标注的模拟模式，绝不编造概率。",
+    "en": "Typed decisions for your agent: an input-menu toggle, a system-prompt hook, and the jev_decide / jev_reference tools. Falls back to an explicitly labelled simulation when no API key is set."
+  },
+  "subpackages": [
+    {
+      "id": "jev_decide",
+      "entry": "packages/jev_decide.js",
+      "enabled_by_default": true,
+      "display_name": {
+        "zh": "Jev 判断",
+        "en": "Jev Decide"
+      },
+      "description": {
+        "zh": "向 Jev 提交类型化判断题（choice / noul / score），返回答案与用量；未配 key 时返回模拟标注。",
+        "en": "Submit typed questions to Jev (choice / noul / score) and get answers plus usage; labelled simulation when no key is set."
+      }
+    },
+    {
+      "id": "jev_reference",
+      "entry": "packages/jev_reference.js",
+      "enabled_by_default": true,
+      "display_name": {
+        "zh": "Jev 手册",
+        "en": "Jev Reference"
+      },
+      "description": {
+        "zh": "离线查阅 Jev 的请求格式、题型规则、返回字段与边界说明。",
+        "en": "Offline reference for the Jev request format, question types, response fields and limits."
+      }
+    }
+  ]
+}
