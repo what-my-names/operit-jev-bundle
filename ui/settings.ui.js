@@ -113,8 +113,21 @@ function Screen(ctx) {
     UI.Card({ containerColor: C.surfaceVariant.copy({ alpha: 0.35 }), shape: { cornerRadius: 12 }, elevation: 0 }, [
       UI.Column({ padding: { horizontal: 14, vertical: 12 }, spacing: 8 }, [
         UI.Text({ text: "通道与密钥", style: "bodyMedium", fontWeight: "semibold" }),
-        UI.TextField({ value: provider, onValueChange: function (v) { setProvider(v); }, label: "通道：auto / openrouter / typesafe / simulation", singleLine: true }),
-        UI.TextButton({ text: "保存通道", onClick: function () { put(constants.ENV_KEYS.provider, provider.trim() || "auto"); } }),
+        UI.Text({ text: "通道（点一个就切换，立即保存）", style: "bodySmall", color: C.onSurfaceVariant.copy({ alpha: 0.85 }) }),
+        UI.LazyRow({ spacing: 6 }, [
+          { id: "auto", label: "auto 自动" },
+          { id: "openrouter", label: "OpenRouter" },
+          { id: "typesafe", label: "TypeSafe" },
+          { id: "simulation", label: "仅模拟" }
+        ].map(function (opt) {
+          var on = (provider === opt.id);
+          return UI.FilterChip({
+            selected: on,
+            onClick: function () { setProvider(opt.id); put(constants.ENV_KEYS.provider, opt.id); },
+            label: UI.Text({ text: opt.label, style: "labelSmall", color: on ? C.onPrimary : C.onSurface }),
+            leadingIcon: on ? UI.Icon({ name: "check", size: 14, tint: C.onPrimary }) : null
+          });
+        })),
         UI.Text({ text: "通道说明：auto = 有哪把钥匙就用哪条；openrouter / typesafe = 只用指定的那条；simulation = 只跑模拟、绝不联网。", style: "bodySmall", color: C.onSurfaceVariant.copy({ alpha: 0.75 }) }),
         UI.Row({ verticalAlignment: "center", horizontalArrangement: "spaceBetween" }, [
           UI.TextButton({
