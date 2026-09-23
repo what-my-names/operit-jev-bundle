@@ -31,7 +31,7 @@ var decide = require(path + "jev_decide.js");
 var reference = require(path + "jev_reference.js");
 
 async function run() {
-  // ① 无密钥 → 模拟
+  // ① 无密钥 + auto → host（零成本兜底，如实标注）
   global.__ENV = {};
   await decide.jev_decide({
     state: "我被重复扣费了，希望退款。",
@@ -39,7 +39,15 @@ async function run() {
       team: { type: "choice", instructions: "该由哪个团队处理?", criteria: { billing: "账单", access: "账户", other: "其它" } }
     })
   });
-  show("无密钥 → 应为 simulation");
+  show("无密钥 → 应为 host（本机作答）");
+
+  // ①b 显式 simulation → 强制模拟
+  global.__ENV = { JEV_PROVIDER: "simulation" };
+  await decide.jev_decide({
+    state: "x",
+    questions: JSON.stringify({ ok: { type: "noul", instructions: "是否成立?" } })
+  });
+  show("显式 simulation → 应为 simulation");
 
   // ② 非法题目 → 抛错被 wrap 捕获
   await decide.jev_decide({
@@ -63,7 +71,8 @@ async function run() {
   console.log(results.join("\n\n"));
   console.log("\n=== 判定 ===");
   var text = results.join(" ");
-  console.log("① simulation:", text.indexOf('"mode": "simulation"') >= 0);
+  console.log("① 无密钥→host:", text.indexOf('"mode": "host"') >= 0);
+  console.log("①b 显式 simulation:", text.indexOf('"mode": "simulation"') >= 0);
   console.log("② 校验拦截:", text.indexOf("2–10") >= 0);
   console.log("③ error 且未编答案:", text.indexOf('"mode": "error"') >= 0);
   console.log("④ 手册可读:", text.indexOf("choice：criteria") >= 0);

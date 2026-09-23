@@ -24,6 +24,7 @@ var DEFAULT_PROMPT = [
   "- probability / confidence 不是「正确率」；confidence 只描述整个分布的形状。",
   "- 低于 JEV_MIN_PROBABILITY（默认 0.7）要标 needs_review，并向用户说明。",
   "- 返回 mode=simulation 时，必须原样告诉用户「这是模拟，不是真 Jev」，不得给出任何像结论的答案。",
+  "- 返回 mode=host 时（未配密钥的零成本兜底）：按返回里的 how_to_answer 自己按题型作答，并在回复里写明「本次是 mode=host 本机作答，不是真 Jev」。",
   "- 返回 mode=error 时如实转述状态码与错误原文，不猜测、不补答案。",
   "- 格式细节不确定就调 jev_reference 查，不要凭记忆编参数。",
   "",

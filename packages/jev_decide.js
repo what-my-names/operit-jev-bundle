@@ -23,7 +23,7 @@
             "parameters": [
                 { "name": "state", "description": { "zh": "证据或上下文（会发给服务商）", "en": "Evidence or context sent to the provider" }, "type": "string", "required": true },
                 { "name": "questions", "description": { "zh": "题目对象或 JSON 字符串", "en": "Questions object or JSON string" }, "type": "string", "required": true },
-                { "name": "mode", "description": { "zh": "auto / real / simulation，默认 auto", "en": "auto / real / simulation, default auto" }, "type": "string", "required": false }
+                { "name": "mode", "description": { "zh": "auto / real / host / simulation，默认 auto", "en": "auto / real / host / simulation, default auto" }, "type": "string", "required": false }
             ]
         }
     ]
@@ -66,11 +66,11 @@ function validate(questions) {
   return questions;
 }
 
-function simulationAnswers(questions) {
+function simulationAnswers(questions, reasonText) {
   /* 字段形态与真返回对齐：choice→choice/probabilities/confidence；noul→noul（无 confidence）；score→score/legend/probabilities/confidence */
   var out = {};
   var ids = Object.keys(questions);
-  var why = "未配置 API 密钥：这是模拟占位，不是 Jev 的答案";
+  var why = reasonText || "未配置 API 密钥：这是模拟占位，不是 Jev 的答案";
   for (var i = 0; i < ids.length; i++) {
     var id = ids[i], t = questions[id].type;
     if (t === "choice") {
@@ -84,18 +84,20 @@ function simulationAnswers(questions) {
   return out;
 }
 
+/* 通道解析：host = 本机模型自行作答（零成本，如实标注不是 Jev） */
 function resolveProvider(mode) {
   var want = String(mode || "").toLowerCase();
   var configured = env("JEV_PROVIDER").toLowerCase() || "auto";
   var pick = (want === "real" || want === "auto") ? configured : want;
   var hasOR = env("OPENROUTER_API_KEY").length > 0;
   var hasTS = env("TYPESAFE_API_KEY").length > 0;
-  if (pick === "simulation") return { provider: "none", key: "", kind: "simulation" };
-  if (pick === "openrouter") return hasOR ? { provider: "openrouter", key: env("OPENROUTER_API_KEY"), kind: "real" } : { provider: "none", key: "", kind: "simulation" };
-  if (pick === "typesafe") return hasTS ? { provider: "typesafe", key: env("TYPESAFE_API_KEY"), kind: "real" } : { provider: "none", key: "", kind: "simulation" };
-  if (hasOR) return { provider: "openrouter", key: env("OPENROUTER_API_KEY"), kind: "real" };
-  if (hasTS) return { provider: "typesafe", key: env("TYPESAFE_API_KEY"), kind: "real" };
-  return { provider: "none", key: "", kind: "simulation" };
+  if (pick === "simulation") return { kind: "simulation" };
+  if (pick === "host") return { kind: "host" };
+  if (pick === "openrouter") return hasOR ? { kind: "real", provider: "openrouter", key: env("OPENROUTER_API_KEY") } : { kind: "host" };
+  if (pick === "typesafe") return hasTS ? { kind: "real", provider: "typesafe", key: env("TYPESAFE_API_KEY") } : { kind: "host" };
+  if (hasOR) return { kind: "real", provider: "openrouter", key: env("OPENROUTER_API_KEY") };
+  if (hasTS) return { kind: "real", provider: "typesafe", key: env("TYPESAFE_API_KEY") };
+  return { kind: "host" };
 }
 
 async function httpJson(url, headers, body) {
@@ -161,6 +163,28 @@ async function jev_decide(params) {
       model: null,
       note: "未配置 OPENROUTER_API_KEY / TYPESAFE_API_KEY，本次不是真 Jev。请让用户手动判断，或配置密钥后重试。",
       answers: simulationAnswers(questions),
+      usage: null
+    };
+  }
+
+  /* host：没密钥也能用 —— 把规范化题目交回宿主 AI 自己按题型作答，如实标注不是 Jev */
+  if (route.kind === "host") {
+    await logUsage({ time: new Date().toISOString().replace("T", " ").slice(0, 19), mode: "host", provider: "host", cost: 0 });
+    return {
+      mode: "host",
+      jev_called: false,
+      provider: "host",
+      model: null,
+      note: "未配置 API 密钥：本次由本机模型按 Jev 的题型规范自行作答（mode=host）。这不是真 Jev，没有校准概率，必须在回复里如实标注。",
+      request: { state: state, questions: questions },
+      how_to_answer: [
+        "choice：填 choice（选中项名）、probabilities（选项→概率，和为 1）、confidence（0–1）",
+        "noul：填 noul（「是」的概率 0–1），没有 confidence 字段",
+        "score：填 score（概率加权档位序号，可为小数）、legend（档位数组）、probabilities、confidence",
+        "每题都给 needs_review：把握不足或证据不足时为 true，并说明理由",
+        "在回复里写明：本次是 mode=host（本机作答），不是真 Jev"
+      ],
+      answers: simulationAnswers(questions, "本机作答：请由宿主模型填写，字段格式见 how_to_answer"),
       usage: null
     };
   }

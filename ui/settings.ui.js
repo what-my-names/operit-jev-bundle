@@ -79,6 +79,19 @@ function Screen(ctx) {
   var hasTS = readEnv(constants.ENV_KEYS.typesafeKey).trim().length > 0;
   var skills = readEnv("JEV_SKILLS_FOUND").trim();
 
+  var CHANNELS = [
+    { id: "auto", label: "🔄 自动", desc: "有钥匙就用真 Jev，没钥匙自动转本机作答" },
+    { id: "openrouter", label: "🌐 OpenRouter", desc: "只走 OpenRouter（要 sk-or 开头的钥匙）" },
+    { id: "typesafe", label: "🛡 TypeSafe", desc: "只走官方直连（要官方控制台的钥匙）" },
+    { id: "host", label: "🤖 本机作答", desc: "零成本：本机模型按题型作答，不是真 Jev" },
+    { id: "simulation", label: "🚫 仅模拟", desc: "不产出答案，只回格式骨架" }
+  ];
+  var curLabel = "🔄 自动";
+  var curDesc = CHANNELS[0].desc;
+  for (var ci = 0; ci < CHANNELS.length; ci++) {
+    if (CHANNELS[ci].id === provider) { curLabel = CHANNELS[ci].label; curDesc = CHANNELS[ci].desc; }
+  }
+
   return UI.Column({ padding: { horizontal: 16, vertical: 12 }, spacing: 10 }, [
     UI.Row({ verticalAlignment: "center", spacing: 8 }, [
       UI.Icon({ name: "tune", tint: "primary", size: 22 }),
@@ -105,13 +118,8 @@ function Screen(ctx) {
     UI.Card({ containerColor: C.surfaceVariant.copy({ alpha: 0.35 }), shape: { cornerRadius: 12 }, elevation: 0 }, [
       UI.Column({ padding: { horizontal: 14, vertical: 10 }, spacing: 6 }, [
         UI.Text({ text: "通道与密钥", style: "bodyMedium", fontWeight: "semibold" }),
-        UI.Text({ text: "通道（点一个就切换，立即保存）", style: "bodySmall", color: C.onSurfaceVariant.copy({ alpha: 0.85 }) }),
-        UI.LazyRow({ spacing: 6 }, [
-          { id: "auto", label: "auto 自动" },
-          { id: "openrouter", label: "OpenRouter" },
-          { id: "typesafe", label: "TypeSafe" },
-          { id: "simulation", label: "仅模拟" }
-        ].map(function (opt) {
+        UI.Text({ text: "通道（点一下即切换）", style: "bodySmall", color: C.onSurfaceVariant.copy({ alpha: 0.85 }) }),
+        UI.LazyRow({ spacing: 6 }, CHANNELS.map(function (opt) {
           var on = (provider === opt.id);
           return UI.FilterChip({
             selected: on,
@@ -120,7 +128,7 @@ function Screen(ctx) {
             leadingIcon: on ? UI.Icon({ name: "check", size: 14, tint: C.onPrimary }) : null
           });
         })),
-        UI.Text({ text: "通道说明：auto = 有哪把钥匙就用哪条；openrouter / typesafe = 只用指定的那条；simulation = 只跑模拟、绝不联网。", style: "bodySmall", color: C.onSurfaceVariant.copy({ alpha: 0.75 }) }),
+        UI.Text({ text: "当前：" + curLabel + " —— " + curDesc, style: "bodySmall", color: C.primary.copy({ alpha: 0.9 }) }),
         UI.TextButton({
           text: (hasOR ? "✓ " : "○ ") + "OpenRouter Key" + (orOpen ? "（点击收起）" : "（点击填写）"),
           onClick: function () { setOrKey(""); setOrOpen(!orOpen); }
