@@ -76,12 +76,21 @@ async function refreshPrompt() {
   var fromEnv = readEnv(constants.ENV_KEYS.customPrompt).trim();
   if (fromEnv) { cachedPrompt = fromEnv; }
   else { cachedPrompt = (await readFileText(constants.PROMPT_PATH)).trim(); }
-  detectSkills().catch(function () {});
+  await detectSkills().catch(function () {}); /* 等探测完成，避免首次组装提示词拿不到技能列表 */
   return cachedPrompt;
 }
 
 function currentPromptText() {
-  return promptMod.buildPrompt(cachedPrompt, cachedSkills);
+  /* 提示词：环境变量优先 → 面板保存后下一轮立即生效，不用重启 */
+  var fromEnv = readEnv(constants.ENV_KEYS.customPrompt).trim();
+  var base = fromEnv || cachedPrompt;
+  /* 技能：优先读环境变量，兜住「首次组装早于探测完成」的时序 */
+  var skillNames = cachedSkills;
+  if (!skillNames || skillNames.length === 0) {
+    var raw = readEnv("JEV_SKILLS_FOUND").trim();
+    if (raw) skillNames = raw.split(",");
+  }
+  return promptMod.buildPrompt(base, skillNames);
 }
 
 /* ── 1) 系统提示词注入：只在开关开启时追加，关闭则原样返回（零 token 开销） ── */

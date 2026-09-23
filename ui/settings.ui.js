@@ -37,8 +37,12 @@ function Screen(ctx) {
   function put(key, value) {
     try {
       var p = Tools.SoftwareSettings.writeEnvironmentVariable(key, value);
-      if (p && typeof p.catch === "function") p.catch(function () {});
-      setStatus("已保存");
+      if (p && typeof p.then === "function") {
+        p.then(function () { setStatus("已保存"); })
+          .catch(function (e) { setStatus("保存失败：" + String((e && e.message) || e)); });
+      } else {
+        setStatus("已保存");
+      }
     } catch (e) {
       setStatus("保存失败：" + String((e && e.message) || e));
     }
@@ -71,20 +75,8 @@ function Screen(ctx) {
   var orOpen = s7[0], setOrOpen = s7[1];
   var s8 = ctx.useState("jev_ts_open", false);
   var tsOpen = s8[0], setTsOpen = s8[1];
-  var s9 = ctx.useState("jev_or_show", false);
-  var orShow = s9[0], setOrShow = s9[1];
-  var s10 = ctx.useState("jev_ts_show", false);
-  var tsShow = s10[0], setTsShow = s10[1];
-
-  var orVal = readEnv(constants.ENV_KEYS.openrouterKey).trim();
-  var tsVal = readEnv(constants.ENV_KEYS.typesafeKey).trim();
-  var hasOR = orVal.length > 0;
-  var hasTS = tsVal.length > 0;
-  var mask = function (v) {
-    if (!v) return "";
-    if (v.length <= 8) return "••••••";
-    return v.slice(0, 4) + "••••••" + v.slice(-4);
-  };
+  var hasOR = readEnv(constants.ENV_KEYS.openrouterKey).trim().length > 0;
+  var hasTS = readEnv(constants.ENV_KEYS.typesafeKey).trim().length > 0;
   var skills = readEnv("JEV_SKILLS_FOUND").trim();
 
   return UI.Column({ padding: { horizontal: 16, vertical: 12 }, spacing: 10 }, [
@@ -111,7 +103,7 @@ function Screen(ctx) {
       ])
     ]),
     UI.Card({ containerColor: C.surfaceVariant.copy({ alpha: 0.35 }), shape: { cornerRadius: 12 }, elevation: 0 }, [
-      UI.Column({ padding: { horizontal: 14, vertical: 12 }, spacing: 8 }, [
+      UI.Column({ padding: { horizontal: 14, vertical: 10 }, spacing: 6 }, [
         UI.Text({ text: "通道与密钥", style: "bodyMedium", fontWeight: "semibold" }),
         UI.Text({ text: "通道（点一个就切换，立即保存）", style: "bodySmall", color: C.onSurfaceVariant.copy({ alpha: 0.85 }) }),
         UI.LazyRow({ spacing: 6 }, [
@@ -129,52 +121,44 @@ function Screen(ctx) {
           });
         })),
         UI.Text({ text: "通道说明：auto = 有哪把钥匙就用哪条；openrouter / typesafe = 只用指定的那条；simulation = 只跑模拟、绝不联网。", style: "bodySmall", color: C.onSurfaceVariant.copy({ alpha: 0.75 }) }),
-        UI.Row({ verticalAlignment: "center", horizontalArrangement: "spaceBetween" }, [
-          UI.TextButton({
-            text: (hasOR ? "OpenRouter 已配置" : "OpenRouter 未配置") + (orOpen ? " ︿" : " ﹀"),
-            onClick: function () { setOrOpen(!orOpen); }
-          }),
-          UI.Text({ text: hasOR ? (orShow ? orVal : mask(orVal)) : "", style: "bodySmall", color: C.onSurfaceVariant.copy({ alpha: 0.85 }) })
-        ]),
-        orOpen ? UI.TextField({ value: orKey, onValueChange: function (v) { setOrKey(v); }, label: "粘贴 OpenRouter Key（sk-or-v1-…）", singleLine: true }) : UI.Text({ text: "", style: "bodySmall" }),
-        orOpen ? UI.Row({ horizontalArrangement: "end" }, [
-          UI.TextButton({
-            text: "保存",
-            onClick: function () {
-              if (!orKey.trim()) { setStatus("请先粘贴内容再保存"); return; }
-              put(constants.ENV_KEYS.openrouterKey, orKey.trim());
-              setOrKey(""); setOrOpen(false); setOrShow(false);
-            }
-          }),
-          UI.TextButton({ text: "取消", onClick: function () { setOrKey(""); setOrOpen(false); } })
-        ]) : UI.Text({ text: "", style: "bodySmall" }),
-        hasOR ? UI.Row({ horizontalArrangement: "end" }, [
-          UI.TextButton({ text: orShow ? "隐藏" : "显示", onClick: function () { setOrShow(!orShow); } })
-        ]) : UI.Text({ text: "", style: "bodySmall" }),
-        UI.Row({ verticalAlignment: "center", horizontalArrangement: "spaceBetween" }, [
-          UI.TextButton({
-            text: (hasTS ? "TypeSafe 已配置" : "TypeSafe 未配置") + (tsOpen ? " ︿" : " ﹀"),
-            onClick: function () { setTsOpen(!tsOpen); }
-          }),
-          UI.Text({ text: hasTS ? (tsShow ? tsVal : mask(tsVal)) : "", style: "bodySmall", color: C.onSurfaceVariant.copy({ alpha: 0.85 }) })
-        ]),
-        tsOpen ? UI.TextField({ value: tsKey, onValueChange: function (v) { setTsKey(v); }, label: "粘贴 TypeSafe Key", singleLine: true }) : UI.Text({ text: "", style: "bodySmall" }),
-        tsOpen ? UI.Row({ horizontalArrangement: "end" }, [
-          UI.TextButton({
-            text: "保存",
-            onClick: function () {
-              if (!tsKey.trim()) { setStatus("请先粘贴内容再保存"); return; }
-              put(constants.ENV_KEYS.typesafeKey, tsKey.trim());
-              setTsKey(""); setTsOpen(false); setTsShow(false);
-            }
-          }),
-          UI.TextButton({ text: "取消", onClick: function () { setTsKey(""); setTsOpen(false); } })
-        ]) : UI.Text({ text: "", style: "bodySmall" }),
-        hasTS ? UI.Row({ horizontalArrangement: "end" }, [
-          UI.TextButton({ text: tsShow ? "隐藏" : "显示", onClick: function () { setTsShow(!tsShow); } })
-        ]) : UI.Text({ text: "", style: "bodySmall" }),
+        UI.TextButton({
+          text: (hasOR ? "✓ " : "○ ") + "OpenRouter Key" + (orOpen ? "（点击收起）" : "（点击填写）"),
+          onClick: function () { setOrKey(""); setOrOpen(!orOpen); }
+        }),
+        orOpen ? UI.Column({ spacing: 4 }, [
+          UI.TextField({ value: orKey, onValueChange: function (v) { setOrKey(v); }, label: "粘贴 OpenRouter Key（sk-or-v1-…）", singleLine: true }),
+          UI.Row({ horizontalArrangement: "end" }, [
+            UI.TextButton({ text: "取消", onClick: function () { setOrKey(""); setOrOpen(false); } }),
+            UI.TextButton({
+              text: "保存",
+              onClick: function () {
+                if (!orKey.trim()) { setStatus("请先粘贴内容再保存"); return; }
+                put(constants.ENV_KEYS.openrouterKey, orKey.trim());
+                setOrKey(""); setOrOpen(false);
+              }
+            })
+          ])
+        ]) : UI.Spacer({}),
+        UI.TextButton({
+          text: (hasTS ? "✓ " : "○ ") + "TypeSafe Key" + (tsOpen ? "（点击收起）" : "（点击填写）"),
+          onClick: function () { setTsKey(""); setTsOpen(!tsOpen); }
+        }),
+        tsOpen ? UI.Column({ spacing: 4 }, [
+          UI.TextField({ value: tsKey, onValueChange: function (v) { setTsKey(v); }, label: "粘贴 TypeSafe Key", singleLine: true }),
+          UI.Row({ horizontalArrangement: "end" }, [
+            UI.TextButton({ text: "取消", onClick: function () { setTsKey(""); setTsOpen(false); } }),
+            UI.TextButton({
+              text: "保存",
+              onClick: function () {
+                if (!tsKey.trim()) { setStatus("请先粘贴内容再保存"); return; }
+                put(constants.ENV_KEYS.typesafeKey, tsKey.trim());
+                setTsKey(""); setTsOpen(false);
+              }
+            })
+          ])
+        ]) : UI.Spacer({}),
         UI.Text({ text: "技能联动：" + (skills ? "已检测到 " + skills + "，提示词里已写明配合用法" : "未检测到 Jev skill（仅用内置提示词，另装 skill 可增强）"), style: "bodySmall", color: C.onSurfaceVariant.copy({ alpha: 0.85 }) }),
-        UI.Text({ text: "密钥只写入本机环境变量；面板平时不显示明文，点「显示」才看得见，留空保存不改动。", style: "bodySmall", color: C.onSurfaceVariant.copy({ alpha: 0.7 }) })
+        UI.Text({ text: "密钥写入本机环境变量，面板不回显明文；点标题展开抽屉填写，保存后自动收起。", style: "bodySmall", color: C.onSurfaceVariant.copy({ alpha: 0.7 }) })
       ])
     ]),
     UI.Card({ containerColor: C.surfaceVariant.copy({ alpha: 0.35 }), shape: { cornerRadius: 12 }, elevation: 0 }, [

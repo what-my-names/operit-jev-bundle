@@ -3,7 +3,8 @@
  * 验证：① 无密钥 → simulation ② 参数校验报错 ③ 有密钥但 httpPost 抛错 → error 不猜答案
  *       ④ jev_reference 章节读取
  */
-var path = "/sdcard/Download/Operit/dev_package/com.whatmynames.jev_bundle/packages/";
+var path = String(process.argv[2] || "/sdcard/x/jev-融合/插件/packages/");
+if (path.slice(-1) !== "/") path = path + "/";
 var results = [];
 
 global.getEnv = function (k) { return global.__ENV[k] || ""; };

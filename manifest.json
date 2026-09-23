@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "toolpkg_id": "com.whatmynames.jev_bundle",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "author": ["what-my-names"],
   "main": "main.js",
   "name": "jev_bundle",

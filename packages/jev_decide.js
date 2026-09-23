@@ -67,17 +67,19 @@ function validate(questions) {
 }
 
 function simulationAnswers(questions) {
+  /* 字段形态与真返回对齐：choice→choice/probabilities/confidence；noul→noul（无 confidence）；score→score/legend/probabilities/confidence */
   var out = {};
   var ids = Object.keys(questions);
+  var why = "未配置 API 密钥：这是模拟占位，不是 Jev 的答案";
   for (var i = 0; i < ids.length; i++) {
     var id = ids[i], t = questions[id].type;
-    out[id] = {
-      type: t,
-      value: null,
-      probability: null,
-      needs_review: true,
-      reason: "未配置 API 密钥：这是模拟占位，不是 Jev 的答案"
-    };
+    if (t === "choice") {
+      out[id] = { type: t, choice: null, probabilities: null, confidence: null, needs_review: true, reason: why };
+    } else if (t === "noul") {
+      out[id] = { type: t, noul: null, needs_review: true, reason: why };
+    } else {
+      out[id] = { type: t, score: null, legend: null, probabilities: null, confidence: null, needs_review: true, reason: why };
+    }
   }
   return out;
 }
@@ -106,9 +108,15 @@ async function httpJson(url, headers, body) {
     try {
       var res = await candidates[i]();
       return { res: res, shape: i };
-    } catch (e) { lastErr = e; }
+    } catch (e) {
+      lastErr = e;
+      var msg = String((e && e.message) || e);
+      /* 只有错误看起来是「参数/签名不对」时才换形状重试；
+         网络超时等错误直接报错，避免重复发出计费请求 */
+      if (!/argument|parameter|arity|typecast|参数|类型/i.test(msg)) break;
+    }
   }
-  throw new Error("httpPost 调用失败（参数形状未验证）：" + String((lastErr && lastErr.message) || lastErr));
+  throw new Error("httpPost 调用失败：" + String((lastErr && lastErr.message) || lastErr));
 }
 
 function normalize(res) {
