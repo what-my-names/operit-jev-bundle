@@ -1,8 +1,10 @@
 {
   "schema_version": 1,
   "toolpkg_id": "com.whatmynames.jev_bundle",
-  "version": "0.1.5",
-  "author": ["what-my-names"],
+  "version": "0.1.6",
+  "author": [
+    "what-my-names"
+  ],
   "main": "main.js",
   "name": "jev_bundle",
   "display_name": {
@@ -10,8 +12,8 @@
     "en": "Jev Decision"
   },
   "description": {
-    "zh": "把「选择 / 分类 / 评分」交给 Jev 的类型化判断：输入框开关 + 系统提示词注入 + jev_decide / jev_reference 两个工具。无 key 时降级为如实标注的模拟模式，绝不编造概率。",
-    "en": "Typed decisions for your agent: an input-menu toggle, a system-prompt hook, and the jev_decide / jev_reference tools. Falls back to an explicitly labelled simulation when no API key is set."
+    "zh": "**Jev 让 Agent 做出类型化判断**：要选项就从给定选项里挑（choice），要是非就给概率（noul），要评级就按档位打分（score）。结果由代码校验，不靠模型自我感觉。\n\n### 装完你会得到\n- 输入框旁的「Jev 模式」开关：开启后向系统提示词追加 Jev 规范；**关闭则完全不追加（零开销）**\n- 侧边栏「Jev 设置」面板：开关 / 5 档通道 / 密钥抽屉 / 系统提示词可整段替换\n- 两个工具：`jev_decide`（做判断）、`jev_reference`（离线手册 7 节，不联网不花钱）\n- AI 写出的 `<jev>…</jev>` 会渲染成一行决策\n- 若已装同源 5 个 skill，会自动检测并在提示词里写明配合用法\n\n### 五档通道（面板点选）\n| 档位 | 行为 |\n|---|---|\n| 🔄 自动 | 有 key 走真 Jev；没 key 自动转本机作答 |\n| 🌐 OpenRouter / 🛡 TypeSafe | 只走指定通道 |\n| 🤖 本机作答（mode=host） | 零成本：把规范化题目交回当前模型作答，并强制标注「不是真 Jev」 |\n| 🚫 仅模拟 | 只回格式骨架，不产出答案 |\n\n### 密钥（可选）\n- 有 `OPENROUTER_API_KEY` 或 `TYPESAFE_API_KEY` 即可用真 Jev；官方价 **$42 / 十亿 input token**（一次判断约 $0.00002）\n- 没有 key 也能装、能用：自动转本机作答，或选「仅模拟」\n- 拿 key：openrouter.ai/settings/keys 或 console.typesafe.ai\n- 密钥只写本机环境变量；面板不回显；请勿发在聊天或公开仓库\n\n### 副作用与边界\n- **会联网**：真实模式向 openrouter.ai / api.typesafe.ai 发 POST；本机作答与模拟模式不联网\n- **数据出境**：`state` 会原样发送给所选服务商，隐私内容请先确认\n- **注入系统提示词**：开启开关时向 system prompt 追加约 20 行（占少量 token），关闭即零开销，文案可替换\n- **新增界面元素**：输入菜单开关、侧边栏入口（可在包管理停用）\n- 面板保存通道 / 密钥 / 提示词会写入本机环境变量（不上传）\n- probability / confidence **不是正确率**；选择不等于授权\n\n### 仓库\n- 插件源码 / Release：https://github.com/what-my-names/operit-jev-bundle\n- 配套技能包（5 个 skill）：https://github.com/what-my-names/operit-jev-skills\n\n### 已知限制\n- 上游为 alpha 阶段端点，路径或模型名可能变动\n- 真机带密钥的真实调用尚未验证；遇错返回 mode=error 与状态码，不猜答案",
+    "en": "Typed decisions for your agent: pick from options (choice), answer yes/no with a probability (noul), or score against a rubric (score). Ships an input-menu toggle, a system-prompt hook, a sidebar settings panel, and the jev_decide / jev_reference tools. Keys are optional: without one the plugin falls back to labelled host-answer (mode=host) instead of pretending. See repository for full disclosure."
   },
   "subpackages": [
     {
