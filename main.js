@@ -27,7 +27,8 @@ function readEnv(key) {
 }
 
 function jevEnabled() {
-  return readEnv(constants.ENV_KEYS.enabled).trim() === "1";
+  var v = readEnv(constants.ENV_KEYS.enabled).trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes" || v === "on";
 }
 
 async function writeEnv(key, value) {
@@ -109,8 +110,10 @@ function onSystemPromptCompose(params) {
 /* ── 2) 输入菜单开关：「Jev 模式」 ── */
 async function onInputMenuToggle(params) {
   try {
-    var p = (params && params.eventPayload) ? params.eventPayload : (params || {});
-    var action = String(p.action || "");
+    var top = params || {};
+    var ep = top.eventPayload || {};
+    var action = String(ep.action || top.action || "");
+    var toggleId = String(ep.toggleId || top.toggleId || "");
     if (action === "create") {
       return {
         toggles: [{
@@ -121,9 +124,15 @@ async function onInputMenuToggle(params) {
         }]
       };
     }
-    if (action === "toggle" && String(p.toggleId || "") === "jev_mode") {
-      await writeEnv(constants.ENV_KEYS.enabled, p.isChecked ? "1" : "0");
-      await refreshPrompt();
+    if (action === "toggle" && toggleId === "jev_mode") {
+      var next = !jevEnabled(); /* 翻转写入：不依赖回调里的 isChecked（真机教训） */
+      await writeEnv(constants.ENV_KEYS.enabled, next ? "1" : "0");
+      refreshPrompt().catch(function () {}); /* 后台预热，不阻塞点击 */
+      try {
+        await writeEnv("JEV_LAST_TOGGLE_DEBUG",
+          ("a=" + action + " t=" + toggleId + " ic=" + String(ep.isChecked) +
+            " keys=" + Object.keys(ep).join("|")).slice(0, 200));
+      } catch (e2) {}
       return { ok: true };
     }
     return { ok: false };
