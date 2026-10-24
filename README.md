@@ -50,7 +50,7 @@
 
 - 概率与置信度**不是正确率**，请按自己的任务实测校准。
 - 上游接口为 alpha 阶段，路径或模型名可能变动。
-- `Tools.Network.httpPost` 的参数形状在官方 types 缺失情况下来自推断，**真实调用尚未验证**（需带密钥实测）；如遇请求失败，插件会返回 `mode=error` 与状态码，不会猜答案。
+- **网络层已按真机修正**（v0.1.10）：真实宿主 API 是 `Tools.Net.http({url, method, headers, body})`（正文读 `res.content`）；`Tools.Network` **不存在**，`httpPost(url, body, ignoreSsl)` 也没有 headers 参数——认证头会被当成 ignoreSsl 吞掉。请求头可发出、两端点连通性已在真机验证；带密钥的付费调用仍未验证，失败时返回 `mode=error` 与状态码，不猜答案。
 - 选择不等于授权：Jev 只给建议，执行与否由你决定。
 
 ## 来源与许可
@@ -99,13 +99,14 @@
 - 官方文档：https://docs.typesafe.ai （入门 /introduction、快速开始、三种题型、Confidence、Patterns；给 AI 读的全站索引 https://docs.typesafe.ai/llms.txt）
 - 拿 key：https://console.typesafe.ai
 - 两个端点（二选一）：
-  - TypeSafe 官方：POST https://api.typesafe.ai/v1/systemone ，模型 jev-1.13.0，头 Authorization: Bearer $TYPESAFE_API_KEY
+  - TypeSafe 官方：POST https://api.typesafe.ai/v1/systemone ，模型 jev-latest（官方示例别名），头 Authorization: Bearer $TYPESAFE_API_KEY
+  - 注意：TypeSafe 官方端点在中国大陆等地区返回 HTTP 451（region blocked），这些地区请改用 OpenRouter 通道
   - OpenRouter：POST https://openrouter.ai/api/alpha/decisions ，模型 typesafe/jev-1.13，头 Authorization: Bearer $OPENROUTER_API_KEY
 - 请求体只有三个顶层字段：{"model": "…", "state": "证据或上下文", "questions": {"q1": {"type": "choice", "instructions": "…", "criteria": {"A": "…", "B": "…"}}}}
-- 响应：{"model": "…", "answers": {"q1": {"choice": "A", "probabilities": {"A": 0.8, "B": 0.2}, "confidence": 0.7}}, "usage": {"input_tokens": …, "output_tokens": …, "cost": …}}
+- 响应：{"model": "…", "answers": {"q1": {"choice": "A", "probabilities": {"A": 0.8, "B": 0.2}, "confidence": 0.7}}, "usage": {"input_tokens": …, "output_tokens": …}}（官方 usage 无 cost 字段；插件按 token 估算 cost_estimate_usd）
 - 题型字段：Choice → choice / probabilities / confidence；Score → score / probabilities / confidence；Noul → noul（0–1，无 confidence）
 - 实现要点（官方建议）：一题只做一件事，多因子请拆题后在代码里自己加权；独立题在同一请求里并行评估、互不影响，加题几乎不增耗时；用 confidence 做门控（高置信自动执行，低置信转人工复核）
-- 本插件的实现：manifest.json + main.js（系统提示词钩子 / 输入菜单开关 / <jev> 渲染 / 侧边栏面板）+ packages/jev_decide.js（校验 + Tools.Network.httpPost + needs_review + host 兜底）+ packages/jev_reference.js（离线手册）；源码 https://github.com/what-my-names/operit-jev-bundle
+- 本插件的实现：manifest.json + main.js（系统提示词钩子 / 输入菜单开关 / <jev> 渲染 / 侧边栏面板）+ packages/jev_decide.js（校验 + Tools.Net.http（带认证头）+ needs_review + host 兜底）+ packages/jev_reference.js（离线手册）；源码 https://github.com/what-my-names/operit-jev-bundle
 
 ### 什么是 Jev？
 - **Jev 不是聊天模型**：它是 TypeSafe 造的「System One」模型，专门**做判断**，不生成文字
@@ -117,7 +118,8 @@
 - 官方文档：https://docs.typesafe.ai
 
 ### 更新日志
-- **v0.1.9**（当前）：修复输入菜单「Jev 模式」开关在部分设备「点不动」——开关状态改为「读当前值→翻转写入」，不再依赖回调参数；点击响应不再等待磁盘预热
+- **v0.1.10**（当前）：修复真实请求链路——改用 `Tools.Net.http` 发送认证头（原 `Tools.Network.httpPost` 不存在/无 headers，真实通道此前从未打通）；模型改用 `jev-latest`；按官方 schema 放宽题型校验；`usage` 无 cost 改为 token 估算；新增 HTTP 451 提示（TypeSafe 部分地区不可用，请用 OpenRouter）
+- **v0.1.9**：修复输入菜单「Jev 模式」开关在部分设备「点不动」——开关状态改为「读当前值→翻转写入」，不再依赖回调参数；点击响应不再等待磁盘预热
 - **v0.1.8**：描述补「什么是 Jev」与更新日志两节；市场文案全面重写为 rich markdown
 - **v0.1.7**：补「配套 Skill 链接」与「Jev API 与实现」（官方文档站 / 控制台 / 两端点 / 请求响应示例 / 实现要点）
 - **v0.1.6**：包描述改为 rich markdown（市场表单预填即带长文档）

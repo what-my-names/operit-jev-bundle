@@ -26,7 +26,8 @@ var SECTIONS = {
     "Jev 做三件事：从给定选项里挑（choice）、判断是非（noul）、按档位打分（score）。它不生成自由文本。",
     "通道（均需自备密钥）：",
     "- OpenRouter：https://openrouter.ai/api/alpha/decisions ，模型 typesafe/jev-1.13，密钥 OPENROUTER_API_KEY",
-    "- TypeSafe 官方：https://api.typesafe.ai/v1/systemone ，模型 jev-1.13.0，密钥 TYPESAFE_API_KEY",
+    "- TypeSafe 官方：https://api.typesafe.ai/v1/systemone ，模型 jev-latest（官方示例别名），密钥 TYPESAFE_API_KEY",
+    "  注：TypeSafe 官方端点在部分网络（如中国大陆）会返回 HTTP 451「not available in your region」，请改用 OpenRouter 通道。",
     "没有密钥时本插件返回 mode=simulation，并标注 jev_called=false、probability=null。"
   ].join("\n"),
 
@@ -38,14 +39,14 @@ var SECTIONS = {
   ].join("\n"),
 
   types: [
-    "choice：criteria 是 {选项名: 说明}，2–255 项；返回 choice / probabilities / confidence。",
-    "noul：是非题；criteria 若给，必须同时含 true 与 false；返回 noul（是概率 0–1），没有 confidence 字段。",
-    "score：criteria 是 2–10 个有序档位描述数组（下标从 0 开始）；返回 score / legend / probabilities / confidence。",
+    "choice：criteria 可以是 {选项名: 说明}（1–255 项）、字符串或数组；返回 choice / probabilities / confidence。",
+    "noul：是非题；criteria 可省略，若给则是 {true, false} 对象（两个键都可选）；返回 noul（是概率 0–1），没有 confidence 字段。",
+    "score：criteria 是 1–10 个有序档位描述数组（下标从 0 开始）；返回 score / legend / probabilities / confidence。",
     "instructions 必填，写清这道题要判断什么。"
   ].join("\n"),
 
   response: [
-    '信封：{ "model": …, "answers": { "题ID": … }, "usage": { "input_tokens", "output_tokens", "cost" } }',
+    '信封：{ "model": …, "answers": { "题ID": … }, "usage": { "input_tokens", "output_tokens" } }（官方 usage 无 cost 字段）',
     "choice：probabilities[选中项] 是该选项概率；confidence 描述整个分布形状，不是最大概率、更不是正确率。",
     "noul：字段本身就是「是」的概率。",
     "score：概率加权后的档位序号，出现小数是正常的。"
@@ -54,6 +55,7 @@ var SECTIONS = {
   errors: [
     "401/403：密钥缺失或无效（两个端点实测：无密钥分别返回 401 / 403）。",
     "400：请求体不合法（题型、criteria 数量、非有限数值等）。",
+    "451：TypeSafe 官方端点在您所在地区不可用；改用 OpenRouter 通道。",
     "响应缺 answers、类型与题目不匹配、概率不在 [0,1]：都属于错误，不能当成通过。",
     "本插件遇到错误时返回 mode=error 并附 http_status 与响应片段，不猜答案。"
   ].join("\n"),

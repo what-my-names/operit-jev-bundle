@@ -34,7 +34,7 @@ var ENDPOINTS = {
   openrouter: "https://openrouter.ai/api/alpha/decisions",
   typesafe: "https://api.typesafe.ai/v1/systemone"
 };
-var MODELS = { openrouter: "typesafe/jev-1.13", typesafe: "jev-1.13.0" };
+var MODELS = { openrouter: "typesafe/jev-1.13", typesafe: "jev-latest" };
 var USAGE_PATH = "/sdcard/Download/Operit/plugins/jev_bundle/usage.json";
 
 function env(key) {
@@ -52,15 +52,27 @@ function validate(questions) {
     var id = ids[i], q = questions[id];
     if (!q || typeof q !== "object") throw new Error(id + ": 题目必须是对象");
     var t = String(q.type || "");
+    if (t === "box") throw new Error(id + ": box 题型需要图片 assets 与专用请求头，本工具暂不支持");
     if (t !== "choice" && t !== "noul" && t !== "score") throw new Error(id + ": type 必须是 choice / noul / score");
     if (!q.instructions) throw new Error(id + ": 缺少 instructions");
     if (t === "choice") {
-      var keys = Object.keys(q.criteria || {});
-      if (keys.length < 2 || keys.length > 255) throw new Error(id + ": choice 需要 2–255 个选项");
+      var c = q.criteria;
+      if (typeof c === "string") {
+        if (!c.trim()) throw new Error(id + ": choice criteria 不能是空字符串");
+      } else if (Array.isArray(c)) {
+        if (c.length === 0) throw new Error(id + ": choice criteria 不能是空数组");
+      } else if (c && typeof c === "object") {
+        var n = Object.keys(c).length;
+        if (n < 1 || n > 255) throw new Error(id + ": choice 选项数需在 1–255 之间");
+      } else {
+        throw new Error(id + ": choice 需要 criteria（字符串 / 数组 / 选项对象）");
+      }
     } else if (t === "score") {
-      if (!Array.isArray(q.criteria) || q.criteria.length < 2 || q.criteria.length > 10) throw new Error(id + ": score 需要 2–10 个有序档位");
+      if (!Array.isArray(q.criteria) || q.criteria.length < 1 || q.criteria.length > 10) throw new Error(id + ": score 需要 1–10 个有序档位（数组）");
     } else {
-      if (q.criteria && (typeof q.criteria !== "object" || !("true" in q.criteria) || !("false" in q.criteria))) throw new Error(id + ": noul 的 criteria 若给出必须同时含 true 与 false");
+      if (q.criteria !== undefined && q.criteria !== null && (typeof q.criteria !== "object" || Array.isArray(q.criteria))) {
+        throw new Error(id + ": noul criteria 需为 {true, false} 对象（可省略）");
+      }
     }
   }
   return questions;
@@ -100,32 +112,26 @@ function resolveProvider(mode) {
   return { kind: "host" };
 }
 
+/* 真机取证（2026-10-19 / 10-24）：
+ * - Tools.Network 不存在，真实命名空间是 Tools.Net
+ * - Tools.Net.httpPost(url, body, ignoreSsl) 没有 headers 参数，认证头会被当成 ignoreSsl 吞掉
+ * - 需要自定义请求头必须走 Tools.Net.http({url, method, headers, body})
+ * - 返回：{url, statusCode, statusMessage, headers, contentType, content, ...}；正文读 res.content
+ */
 async function httpJson(url, headers, body) {
-  var candidates = [
-    function () { return Tools.Network.httpPost(url, body, headers); },
-    function () { return Tools.Network.httpPost(url, headers, body); }
-  ];
-  var lastErr = null;
-  for (var i = 0; i < candidates.length; i++) {
-    try {
-      var res = await candidates[i]();
-      return { res: res, shape: i };
-    } catch (e) {
-      lastErr = e;
-      var msg = String((e && e.message) || e);
-      /* 只有错误看起来是「参数/签名不对」时才换形状重试；
-         网络超时等错误直接报错，避免重复发出计费请求 */
-      if (!/argument|parameter|arity|typecast|参数|类型/i.test(msg)) break;
-    }
+  if (typeof Tools === "undefined" || !Tools.Net || typeof Tools.Net.http !== "function") {
+    throw new Error("宿主缺少 Tools.Net.http（无法发送 Authorization 头），请升级 Operit 后重试");
   }
-  throw new Error("httpPost 调用失败：" + String((lastErr && lastErr.message) || lastErr));
+  var res = await Tools.Net.http({ url: url, method: "POST", headers: headers, body: body });
+  return { res: res, shape: 0 };
 }
 
 function normalize(res) {
   if (res === null || res === undefined) return { status: 0, text: "" };
   if (typeof res === "string") return { status: 200, text: res };
-  var status = Number(res.status || res.statusCode || res.code || 0);
-  var text = res.body || res.content || res.data || res.text || "";
+  var status = Number(res.statusCode || res.status || res.code || 0);
+  var text = (res.content !== undefined && res.content !== null) ? res.content
+    : (res.body || res.data || res.text || "");
   if (typeof text !== "string") text = JSON.stringify(text);
   return { status: status, text: text };
 }
@@ -146,7 +152,11 @@ async function logUsage(row) {
 }
 
 async function jev_decide(params) {
-  var state = String((params && params.state) || "");
+  var rawState = (params && params.state);
+  var state = (rawState === undefined || rawState === null) ? "" : rawState;
+  if (typeof state === "string" && /^\s*[\[{]/.test(state)) {
+    try { state = JSON.parse(state); } catch (e) { /* 解析失败就按字符串发 */ }
+  }
   var rawQuestions = (params && params.questions) || "{}";
   var mode = String((params && params.mode) || "auto");
   var questions = rawQuestions;
@@ -200,7 +210,11 @@ async function jev_decide(params) {
   }
   var n = normalize(resp.res);
   if (n.status && (n.status < 200 || n.status >= 300)) {
-    return { mode: "error", jev_called: true, provider: route.provider, model: model, http_status: n.status, error: String(n.text).slice(0, 500) };
+    var errOut = { mode: "error", jev_called: true, provider: route.provider, model: model, http_status: n.status, error: String(n.text).slice(0, 500) };
+    if (n.status === 451) {
+      errOut.hint = "TypeSafe 官方端点在您所在地区不可用（HTTP 451）。请改用 OpenRouter 通道；没有密钥时可用 mode=host 或 simulation。";
+    }
+    return errOut;
   }
   var data;
   try { data = (typeof n.text === "string" && n.text) ? JSON.parse(n.text) : n.text; } catch (e) { return { mode: "error", jev_called: true, provider: route.provider, error: "响应不是合法 JSON", raw: String(n.text).slice(0, 300) }; }
@@ -212,11 +226,21 @@ async function jev_decide(params) {
   for (var i = 0; i < ids.length; i++) {
     var a = data.answers[ids[i]] || {};
     if (a.type === "choice" && a.probabilities && a.choice && Number(a.probabilities[a.choice]) < minP) needsReview = true;
-    if (a.type === "noul" && Number(a.noul) < minP) needsReview = true;
+    if (a.type === "score" && a.confidence !== undefined && Number(a.confidence) < minP) needsReview = true;
+    /* noul 没有 confidence：用「距 0.5 的距离」当作把握度，两端都算确定 */
+    if (a.type === "noul") {
+      var pn = Number(a.noul);
+      if (isFinite(pn) && Math.max(pn, 1 - pn) < minP) needsReview = true;
+    }
   }
-  var cost = (data.usage && Number(data.usage.cost)) || 0;
-  await logUsage({ time: new Date().toISOString().replace("T", " ").slice(0, 19), mode: "real", provider: route.provider, cost: cost });
-  return { mode: "real", jev_called: true, provider: route.provider, model: data.model || model, answers: data.answers, usage: data.usage || null, needs_review: needsReview };
+  /* 官方响应 usage 只有 input_tokens / output_tokens（没有 cost）；按官方价 $42 / 1B input token 估算 */
+  var usage = data.usage || null;
+  var tokIn = usage ? (Number(usage.input_tokens) || 0) : 0;
+  var tokOut = usage ? (Number(usage.output_tokens) || 0) : 0;
+  var estCost = Number((tokIn * 42 / 1e9).toFixed(8));
+  if (usage) usage.cost_estimate_usd = estCost;
+  await logUsage({ time: new Date().toISOString().replace("T", " ").slice(0, 19), mode: "real", provider: route.provider, input_tokens: tokIn, output_tokens: tokOut, cost_estimate_usd: estCost });
+  return { mode: "real", jev_called: true, provider: route.provider, model: data.model || model, answers: data.answers, usage: usage, needs_review: needsReview };
 }
 
 async function wrap(fn, params) {

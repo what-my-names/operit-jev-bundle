@@ -16,8 +16,8 @@ global.Tools = {
     read: async function () { return ""; },
     write: async function () { return {}; }
   },
-  Network: {
-    httpPost: async function () { throw new Error("network disabled in test"); }
+  Net: {
+    http: async function () { throw new Error("network disabled in test"); }
   }
 };
 
@@ -49,12 +49,21 @@ async function run() {
   });
   show("显式 simulation → 应为 simulation");
 
-  // ② 非法题目 → 抛错被 wrap 捕获
+  // ② 非法题目（超官方上限）→ 抛错被 wrap 捕获
+  await decide.jev_decide({
+    state: "x",
+    questions: JSON.stringify({ q1: { type: "score", instructions: "打分", criteria: ["1","2","3","4","5","6","7","8","9","10","11"] } })
+  });
+  show("score 11 档（超过 1–10）→ 应为 error");
+
+  // ②b 官方 schema：score 允许 1 档 → 合法
+  global.__ENV = { JEV_PROVIDER: "simulation" };
   await decide.jev_decide({
     state: "x",
     questions: JSON.stringify({ q1: { type: "score", instructions: "打分", criteria: ["只有一档"] } })
   });
-  show("score 只有 1 档 → 应为 error");
+  var mode2b = (global.__LAST || {}).mode;
+  show("score 1 档 → 应为 simulation（合法）");
 
   // ③ 有密钥但网络失败 → error，不猜
   global.__ENV = { OPENROUTER_API_KEY: "sk-fake" };
@@ -73,7 +82,8 @@ async function run() {
   var text = results.join(" ");
   console.log("① 无密钥→host:", text.indexOf('"mode": "host"') >= 0);
   console.log("①b 显式 simulation:", text.indexOf('"mode": "simulation"') >= 0);
-  console.log("② 校验拦截:", text.indexOf("2–10") >= 0);
+  console.log("② 校验拦截:", text.indexOf("1–10") >= 0);
+  console.log("②b 1档合法:", mode2b === "simulation");
   console.log("③ error 且未编答案:", text.indexOf('"mode": "error"') >= 0);
   console.log("④ 手册可读:", text.indexOf("choice：criteria") >= 0);
 }
